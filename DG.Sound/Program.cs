@@ -11,7 +11,7 @@ namespace DG.Sound
     class Program
     {
         private static int fftLength = 1024; // NAudio fft wants powers of two!
-        private static SpectrumAnalyzer analyzer = new SpectrumAnalyzer();
+        private static SpectrumAnalyzer analyzer = new SpectrumAnalyzer(fftLength);
         private static WaveStream wave;
         private static long totalBytes;
 
@@ -38,15 +38,17 @@ namespace DG.Sound
             string totalTime = wave.TotalTime.ToString();
             var x = wave.Length;
             byte[] buffer = new byte[fftLength];
-            int offset = 0;
             int bytes = 1;
+            int index = 0;
             while (wave.CanRead && bytes > 0 && wave.CurrentTime <= wave.TotalTime)
             {
+                TimeSpan time = wave.CurrentTime;
+                index++;
                 bytes = wave.Read(buffer, 0, fftLength);
+                wave.Seek(index * 256, System.IO.SeekOrigin.Begin);
                 totalBytes += bytes;
-                offset += bytes;
                 WaveInEventArgs e = new WaveInEventArgs(buffer, bytes);
-                OnDataAvailable(null, e, wave.CurrentTime);
+                OnDataAvailable(null, e, time);
             }
         }
 

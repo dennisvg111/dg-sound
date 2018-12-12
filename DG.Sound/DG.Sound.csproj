@@ -57,6 +57,7 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SampleAggregator.cs" />
     <Compile Include="SpectrumAnalyzer.cs" />
+    <Compile Include="Beat.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />

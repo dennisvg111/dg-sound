@@ -9,65 +9,172 @@ namespace DG.Sound
 {
     class SpectrumAnalyzer
     {
-        private int bins = 0;
         private TimeSpan currentTime = TimeSpan.Zero;
+
+        private double[] previousFFT;
+        private double specFlux;
+        private double difference;
+        private double timeBetween;
+        private int sampleSize;
+
+        private double hzRange;
+
+        private List<double> spectrumFluxes = new List<double>();
+        private List<double> smootherValues = new List<double>();
+        private double median;
+        private double smoothMedian;
+        private double beatThreshold;
+        private double thresholdSmoother;
+        private Beat lastBeatRegistered = new Beat();
+
+        public SpectrumAnalyzer(int sampleSize)
+        {
+            this.sampleSize = sampleSize;
+            median = 0.0f;
+            smoothMedian = 0.0f;
+            beatThreshold = 0.6f;
+            thresholdSmoother = 0.6f;
+            previousFFT = new double[sampleSize / 2 + 1];
+            for (int i = 0; i < sampleSize / 2; i++)
+            {
+                previousFFT[i] = 0;
+            }
+        }
 
         public void Update(Complex[] fftResults)
         {
-            if (fftResults.Length / 2 != bins)
+            int bins = fftResults.Length / 2;
+            double[] spectrum = new double[fftResults.Length / 2];
+            for (int n = 0; n < fftResults.Length / 2; n += 2)
             {
-                bins = fftResults.Length / 2;
+                double db = ConvertToDB(fftResults[n]);
+                spectrum[n] = db;
             }
 
-            int binsEachCharacter = bins / Console.WindowWidth;
+            beatThreshold = calculateFluxAndSmoothing(spectrum);
 
-            for (int n = 0; n < fftResults.Length / 2; n += binsEachCharacter)
+            if (specFlux > beatThreshold && ((uint)currentTime.TotalMilliseconds - timeBetween) > 350)
             {
-                // averaging out bins
-                double yPos = 0;
-                for (int b = 0; b < 1; b++)
+                //Beat detected
+                if (smootherValues.Count > 1)
                 {
-                    yPos += GetYPosLog(fftResults[n + b]);
+                    smootherValues.Insert(smootherValues.Count - 1, specFlux);
                 }
-                AddResult(n / binsEachCharacter, yPos / 1);
+                else
+                {
+                    smootherValues.Insert(smootherValues.Count, specFlux);
+                }
+                if (smootherValues.Count >= 5)
+                {
+                    smootherValues.Remove(0);
+                }
+
+                timeBetween = (uint)currentTime.TotalMilliseconds;
+
+                Beat t = new Beat(currentTime.Minutes, currentTime.Seconds, currentTime.Milliseconds, (float)specFlux);
+                Console.WriteLine("BEAT " + t + " -- THRESHOLD: " + beatThreshold.ToString("N5") + " -- DIFF: " + (t - lastBeatRegistered) + "ms");
+                lastBeatRegistered = t;
+            }
+            else if (((uint)currentTime.TotalMilliseconds - timeBetween) > 5000)
+            {
+                if (thresholdSmoother > 0.4f)
+                    thresholdSmoother -= 0.4f;
+
+                timeBetween = (uint)currentTime.TotalMilliseconds;
             }
         }
 
-        private double GetYPosLog(Complex c)
+        private double ConvertToDB(Complex c)
         {
-            // not entirely sure whether the multiplier should be 10 or 20 in this case.
-            // going with 10 from here http://stackoverflow.com/a/10636698/7532
-            double intensityDB = 10 * Math.Log10(Math.Sqrt(c.X * c.X + c.Y * c.Y));
+            //double intensityDB = 20 * Math.Log10(Math.Sqrt(c.X * c.X + c.Y * c.Y));
+            double intensityDB = 20 * (c.X * c.X + c.Y * c.Y);
             double minDB = -90;
-            if (intensityDB < minDB) intensityDB = minDB;
-            double percent = intensityDB / minDB;
-            // we want 0dB to be at the top (i.e. yPos = 0)
-            double yPos = percent * Console.WindowHeight;
-            return yPos;
-        }
-
-        private void AddResult(int index, double power)
-        {
-            for (int i = 0; i < power; i++)
+            if (intensityDB < minDB)
             {
-                ConsoleLib.ConsoleWriter.WriteCharacterAt(index, i, '#', ConsoleColor.Black);
+                intensityDB = minDB;
             }
-            for (int i = (int)power; i < Console.WindowHeight; i++)
-            {
-                ConsoleLib.ConsoleWriter.WriteCharacterAt(index, i, '#', ConsoleColor.Green);
-            }
-            string time = currentTime.ToString();
-            int timeChar = 0;
-            foreach (var @char in time)
-            {
-                ConsoleLib.ConsoleWriter.WriteCharacterAt(timeChar, 0, @char, ConsoleColor.White);
-                timeChar++;
-            }
+            return intensityDB;
         }
 
         public void SetTime(TimeSpan currentTime)
         {
             this.currentTime = currentTime;
         }
+
+        private double calculateFluxAndSmoothing(double[] currentSpectrum)
+        {
+            if (currentSpectrum.Any(i => i > 0))
+            {
+
+            }
+            specFlux = 0.0f;
+
+            //Calculate differences
+            for (int i = 0; i < sampleSize / 2; i++)
+            {
+                difference = currentSpectrum[i] - previousFFT[i];
+                if (difference > 0)
+                {
+                    specFlux += difference;
+                }
+            }
+
+            //Get our median for threshold
+            if (spectrumFluxes.Count > 0 && spectrumFluxes.Count < 10)
+            {
+                spectrumFluxes.Sort();
+                smootherValues.Sort();
+                if (spectrumFluxes[spectrumFluxes.Count / 2] > 0)
+                {
+                    median = spectrumFluxes[spectrumFluxes.Count / 2];
+                }
+                if (smootherValues.Count > 0 && smootherValues.Count < 5)
+                {
+                    if (smootherValues[smootherValues.Count / 2] > 0)
+                    {
+                        smoothMedian = smootherValues[smootherValues.Count / 2];
+                    }
+                }
+            }
+            for (int i = 0; i < sampleSize / 2; i++)
+            {
+                if (spectrumFluxes.Count > 1)
+                {
+                    spectrumFluxes.Insert(spectrumFluxes.Count - 1, specFlux);
+                }
+                else
+                {
+                    spectrumFluxes.Insert(spectrumFluxes.Count, specFlux);
+                }
+                if (spectrumFluxes.Count >= 10)
+                {
+                    spectrumFluxes.RemoveAt(0);
+                }
+            }
+
+            //Copy spectrum for next spectral flux calculation
+            for (int j = 0; j < sampleSize / 2; j++)
+            {
+                previousFFT[j] = currentSpectrum[j];
+            }
+            if (smoothMedian > 1)
+            {
+                thresholdSmoother = 0.8f;
+            }
+            if (smoothMedian > 2 && smoothMedian < 4)
+            {
+                thresholdSmoother = 1.0f;
+            }
+            if (smoothMedian > 4 && smoothMedian < 6)
+            {
+                thresholdSmoother = 2.2f;
+            }
+            if (smoothMedian > 6)
+            {
+                thresholdSmoother = 2.4f;
+            }
+            return thresholdSmoother + median;
+        }
+
     }
 }
