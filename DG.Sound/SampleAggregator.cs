@@ -9,7 +9,7 @@ using System.Diagnostics;
 namespace DG.Sound
 { // The Complex and FFT are here!
 
-    class SampleAggregator
+    internal class SampleAggregator
     {
         // FFT
         public event EventHandler<FftEventArgs> FftCalculated;
@@ -24,19 +24,10 @@ namespace DG.Sound
 
         public SampleAggregator(int fftLength)
         {
-            if (!IsPowerOfTwo(fftLength))
-            {
-                throw new ArgumentException("FFT Length must be a power of two");
-            }
             this.m = (int)Math.Log(fftLength, 2.0);
             this.fftLength = fftLength;
             this.fftBuffer = new Complex[fftLength];
             this.fftArgs = new FftEventArgs(fftBuffer);
-        }
-
-        bool IsPowerOfTwo(int x)
-        {
-            return (x & (x - 1)) == 0;
         }
 
         public void Add(float value)

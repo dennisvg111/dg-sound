@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace DG.Sound
 {
-    class Beat
+    public class Beat
     {
         public int Minutes { get; set; }
         public int Seconds { get; set; }

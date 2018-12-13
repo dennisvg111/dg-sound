@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace DG.Sound
 {
-    class SpectrumAnalyzer
+    internal class SpectrumAnalyzer
     {
         private TimeSpan currentTime = TimeSpan.Zero;
 
@@ -16,8 +16,6 @@ namespace DG.Sound
         private double difference;
         private double timeBetween;
         private int sampleSize;
-
-        private double hzRange;
 
         private List<double> spectrumFluxes = new List<double>();
         private List<double> smootherValues = new List<double>();
@@ -35,25 +33,21 @@ namespace DG.Sound
             beatThreshold = 0.6f;
             thresholdSmoother = 0.6f;
             previousFFT = new double[sampleSize / 2 + 1];
-            for (int i = 0; i < sampleSize / 2; i++)
-            {
-                previousFFT[i] = 0;
-            }
         }
 
-        public void Update(Complex[] fftResults)
+        public bool Update(Complex[] fftResults, out Beat beat)
         {
-            int bins = fftResults.Length / 2;
-            double[] spectrum = new double[fftResults.Length / 2];
-            for (int n = 0; n < fftResults.Length / 2; n += 2)
+            int bins = previousFFT.Length;
+            double[] spectrum = new double[bins];
+            for (int n = 0; n < bins; n ++)
             {
-                double db = ConvertToDB(fftResults[n]);
+                double db = GetMagnitude(fftResults[n]) * 10;
                 spectrum[n] = db;
             }
 
             beatThreshold = calculateFluxAndSmoothing(spectrum);
 
-            if (specFlux > beatThreshold && ((uint)currentTime.TotalMilliseconds - timeBetween) > 350)
+            if (specFlux > beatThreshold && ((uint)currentTime.TotalMilliseconds - timeBetween) > 250)
             {
                 //Beat detected
                 if (smootherValues.Count > 1)
@@ -72,8 +66,9 @@ namespace DG.Sound
                 timeBetween = (uint)currentTime.TotalMilliseconds;
 
                 Beat t = new Beat(currentTime.Minutes, currentTime.Seconds, currentTime.Milliseconds, (float)specFlux);
-                Console.WriteLine("BEAT " + t + " -- THRESHOLD: " + beatThreshold.ToString("N5") + " -- DIFF: " + (t - lastBeatRegistered) + "ms");
                 lastBeatRegistered = t;
+                beat = t;
+                return true;
             }
             else if (((uint)currentTime.TotalMilliseconds - timeBetween) > 5000)
             {
@@ -82,18 +77,25 @@ namespace DG.Sound
 
                 timeBetween = (uint)currentTime.TotalMilliseconds;
             }
+            beat = null;
+            return false;
+        }
+
+        private double GetMagnitude(Complex c)
+        {
+            double magnitude = c.X * c.X + c.Y * c.Y;
+            return magnitude;
         }
 
         private double ConvertToDB(Complex c)
-        {
-            //double intensityDB = 20 * Math.Log10(Math.Sqrt(c.X * c.X + c.Y * c.Y));
-            double intensityDB = 20 * (c.X * c.X + c.Y * c.Y);
+        {            
+            double intensityDB = 10 * Math.Log10(GetMagnitude(c));
             double minDB = -90;
             if (intensityDB < minDB)
             {
                 intensityDB = minDB;
             }
-            return intensityDB;
+            return intensityDB + -minDB;
         }
 
         public void SetTime(TimeSpan currentTime)
@@ -103,14 +105,10 @@ namespace DG.Sound
 
         private double calculateFluxAndSmoothing(double[] currentSpectrum)
         {
-            if (currentSpectrum.Any(i => i > 0))
-            {
-
-            }
             specFlux = 0.0f;
 
             //Calculate differences
-            for (int i = 0; i < sampleSize / 2; i++)
+            for (int i = 0; i < currentSpectrum.Length; i++)
             {
                 difference = currentSpectrum[i] - previousFFT[i];
                 if (difference > 0)
@@ -153,7 +151,7 @@ namespace DG.Sound
             }
 
             //Copy spectrum for next spectral flux calculation
-            for (int j = 0; j < sampleSize / 2; j++)
+            for (int j = 0; j < currentSpectrum.Length; j++)
             {
                 previousFFT[j] = currentSpectrum[j];
             }
