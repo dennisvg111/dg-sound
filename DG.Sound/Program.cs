@@ -24,7 +24,7 @@ namespace DG.Sound
 
             using (var wave = new WaveChannel32(new Mp3FileReader(ofd.FileName)))
             {
-                beatReader = new BeatReader(wave);
+                beatReader = new BeatReader(wave, true);
                 beatReader.BeatFound += BeatReader_BeatFound;
 
                 Console.ReadLine();

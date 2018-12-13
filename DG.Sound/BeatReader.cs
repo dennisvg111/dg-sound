@@ -38,7 +38,7 @@ namespace DG.Sound
             }
         }
 
-        public BeatReader(WaveStream wave, int fftLength = 1024)
+        public BeatReader(WaveStream wave, bool keepAlive, int fftLength = 1024)
         {
             if (!IsPowerOfTwo(fftLength))
             {
@@ -74,12 +74,17 @@ namespace DG.Sound
                     }
                     catch (NullReferenceException)
                     {
-                        //thread has been killed or wave has been disposed
+                        //thread has been killed
+                        nullRef = true;
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        //wave has been disposed
                         nullRef = true;
                     }
                 }
             }));
-            beatThread.IsBackground = true;
+            beatThread.IsBackground = !keepAlive;
             beatThread.Start();
         }
 
