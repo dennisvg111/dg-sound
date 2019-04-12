@@ -58,7 +58,7 @@ namespace DG.Sound
             beatThread = new Thread(new ThreadStart(() =>
             {
                 bool nullRef = false;
-                while (wave.CanRead && bytes > 0 && wave.CurrentTime <= wave.TotalTime && !nullRef)
+                while (wave.CanRead && bytes > 0 && wave.CurrentTime < wave.TotalTime && !nullRef)
                 {
                     try
                     {
@@ -90,7 +90,7 @@ namespace DG.Sound
             return (x & (x - 1)) == 0;
         }
 
-        void OnDataAvailable(object sender, WaveInEventArgs e, TimeSpan currentTime)
+        private void OnDataAvailable(object sender, WaveInEventArgs e, TimeSpan currentTime)
         {
             analyzer.SetTime(currentTime);
             byte[] buffer = e.Buffer;
