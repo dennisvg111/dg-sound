@@ -14,8 +14,6 @@ namespace DG.Sound
         private Thread beatThread;
 
         private List<Beat> beats;
-
-        private int fftLength = 1024; // NAudio fft wants powers of two!
         private SpectrumAnalyzer analyzer;
         private WaveStream wave;
         private long totalBytes;
@@ -67,7 +65,7 @@ namespace DG.Sound
                         TimeSpan time = wave.CurrentTime;
                         index++;
                         bytes = wave.Read(buffer, 0, fftLength);
-                        wave.Seek(index * 256, System.IO.SeekOrigin.Begin);
+                        wave.Seek(index * fftLength, System.IO.SeekOrigin.Begin);
                         totalBytes += bytes;
                         WaveInEventArgs e = new WaveInEventArgs(buffer, bytes);
                         OnDataAvailable(null, e, time);
@@ -84,7 +82,6 @@ namespace DG.Sound
                     }
                 }
             }));
-            beatThread.IsBackground = !keepAlive;
             beatThread.Start();
         }
 
